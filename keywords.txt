@@ -1,0 +1,21 @@
+#######################################
+# Syntax Coloring Map for J1850VPWCore
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+J1850VPWCore	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+VPW	KEYWORD2
+init	KEYWORD2
+accept	KEYWORD2
+send	KEYWORD2
+easy_send	KEYWORD2
+						
+#######################################
+# Constants (LITERAL1)
+#######################################
