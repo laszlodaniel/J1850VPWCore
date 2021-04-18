@@ -6,6 +6,8 @@ The library is based on [Ryzhkov Ilya's J1850 library](https://github.com/iiryzh
 
 ![IMG](https://chryslerccdsci.files.wordpress.com/2021/04/pci-bus_transceiver_schematic_03.png)
 
+To be used with my upcoming [CCD/PCI-bus Transceiver Development Boards.](https://github.com/laszlodaniel/CCDPCIBusTransceiver)
+
 ## API
 
 ### Include
