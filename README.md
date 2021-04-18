@@ -23,7 +23,7 @@ Create an instance of the class named 'VPW'.
 - activeLevel - it depends on the transceiver circuit which logic state drives the bus to high voltage (~7V)
 - debug - enable / disable debugging mode
 
-MC33390 transceiver IC: ACTIVE_HIGH
+MC33390 transceiver IC: ACTIVE_HIGH  
 Other custom circuits involving inverted logic: ACTIVE_LOW
 
 Example:
