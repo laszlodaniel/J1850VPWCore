@@ -1,6 +1,6 @@
 /*
  * J1850VPWCore (https://github.com/laszlodaniel/J1850VPWCore)
- * Copyright (C) 2021, László Dániel
+ * Copyright (C) 2021, Daniel Laszlo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
