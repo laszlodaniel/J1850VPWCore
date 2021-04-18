@@ -125,7 +125,7 @@ The **message** class variable contains event codes:
 - 5 - ERROR_SOF_TIMEOUT
 - 6 - ERROR_SYMBOL_WAS_NOT_SOF
 - 7 - ERROR_SYMBOL_WAS_TOO_SHORT
-- 8 - define ERROR_CRC_FAILURE
+- 8 - ERROR_CRC_FAILURE
 
 Example, to check why a message transmission may have failed:
 
