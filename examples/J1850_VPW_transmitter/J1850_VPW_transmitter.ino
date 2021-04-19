@@ -22,6 +22,8 @@ J1850VPWCore VPW;
 
 #define J1850_VPW_RX (10)
 #define J1850_VPW_TX (11)
+#define SLEEP        (5)
+#define _4XLOOP      (6)
 
 uint8_t tx_buf[6] = { 0x48, 0x69, 0x2D, 0x4D, 0x32, 0x21 };
 
@@ -30,11 +32,11 @@ void setup()
     Serial.begin(250000);
 
     // MC33390 settings
-    pinMode(5, OUTPUT);
-    digitalWrite(5, HIGH); // enable PCI-bus transmitter (receiver is always enabled), HIGH: enable, LOW: disable
+    pinMode(SLEEP, OUTPUT);
+    digitalWrite(SLEEP, HIGH); // enable PCI-bus transmitter (receiver is always enabled), HIGH: enable, LOW: disable
     //pinMode(6, INPUT); // PCI-bus loopback mode: transmitted message is immediately received (for testing only)
-    pinMode(6, OUTPUT);
-    digitalWrite(6, LOW); // PCI-bus waveshaping - LOW: enabled, HIGH: disabled
+    pinMode(_4XLOOP, OUTPUT);
+    digitalWrite(_4XLOOP, LOW); // PCI-bus waveshaping - LOW: enabled, HIGH: disabled
 
     VPW.init(J1850_VPW_RX, J1850_VPW_TX, ACTIVE_HIGH, DEBUG_ON);
 }
