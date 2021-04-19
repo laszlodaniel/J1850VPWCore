@@ -34,7 +34,7 @@ void setup()
     // MC33390 settings
     pinMode(SLEEP, OUTPUT);
     digitalWrite(SLEEP, HIGH); // enable PCI-bus transmitter (receiver is always enabled), HIGH: enable, LOW: disable
-    //pinMode(6, INPUT); // PCI-bus loopback mode: transmitted message is immediately received (for testing only)
+    //pinMode(_4XLOOP, INPUT); // PCI-bus loopback mode: transmitted message is immediately received (for testing only)
     pinMode(_4XLOOP, OUTPUT);
     digitalWrite(_4XLOOP, LOW); // PCI-bus waveshaping - LOW: enabled, HIGH: disabled
 
