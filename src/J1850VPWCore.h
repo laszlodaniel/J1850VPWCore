@@ -83,7 +83,7 @@ class J1850VPWCore
     public:
         J1850VPWCore();
         ~J1850VPWCore();
-	    bool begin(uint8_t rxPin, uint8_t txPin, bool activeLevel);
+        bool begin(uint8_t rxPin, uint8_t txPin, bool activeLevel);
         bool begin(uint8_t rxPin, bool activeLevel);
         void write(uint8_t* buffer, uint8_t bufferLength);
         void listenAll();
