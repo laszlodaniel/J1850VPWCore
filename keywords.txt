@@ -6,16 +6,32 @@
 # Datatypes (KEYWORD1)
 #######################################
 J1850VPWCore	KEYWORD1
+VPW	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
 #######################################
-VPW	KEYWORD2
-init	KEYWORD2
-accept	KEYWORD2
-send	KEYWORD2
-easy_send	KEYWORD2
+begin	KEYWORD2
+write	KEYWORD2
+listenAll	KEYWORD2
+listen	KEYWORD2
+ignoreAll	KEYWORD2
+ignore	KEYWORD2
+onMessageReceived	KEYWORD2
+onError	KEYWORD2
 						
 #######################################
 # Constants (LITERAL1)
 #######################################
+J1850VPW_Errors	LITERAL1
+J1850VPW_OK	LITERAL1
+J1850VPW_ERR_TX_DISABLED	LITERAL1
+J1850VPW_ERR_INVALID_MESSAGE_LENGTH	LITERAL1
+J1850VPW_ERR_BUS_IS_BUSY	LITERAL1
+J1850VPW_ERR_BUS_ERROR	LITERAL1
+J1850VPW_ERR_ARBITRATION_LOST	LITERAL1
+J1850VPW_ERR_IFR_NOT_SUPPORTED	LITERAL1
+J1850VPW_ERR_CRC	LITERAL1
+J1850VPW_Operations	LITERAL1
+J1850VPW_Read	LITERAL1
+J1850VPW_Write	LITERAL1
