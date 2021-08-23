@@ -205,11 +205,6 @@ void J1850VPWCore::protocolDecoder()
         {
             _rxBufferPos++;
             _bitPos = 0;
-
-            if (_rxBufferPos != MAX_FRAME_LENGTH)
-            {
-                _rxBuffer[_rxBufferPos] = 0; // clear next byte in buffer for bit-writing
-            }
         }
     }
 
@@ -223,12 +218,13 @@ void J1850VPWCore::processMessage()
 {
     if ((_rxBufferPos > 0) && (_ignoreList[_rxBuffer[0]] == 0))
     {
-        for (uint8_t i = 0; i < _rxBufferPos; i++) _message[i] = _rxBuffer[i]; // copy receive buffer to message buffer
-
-        _messageLength = _rxBufferPos; // save message length
-
-        if (_message[_messageLength - 1] == CRC(_message, _messageLength - 1)) // CRC ok
+        if (_rxBuffer[_rxBufferPos - 1] == CRC(_rxBuffer, _rxBufferPos - 1)) // CRC ok
         {
+            for (uint8_t i = 0; i < _rxBufferPos; i++) _message[i] = _rxBuffer[i]; // copy receive buffer to message buffer
+
+            _messageLength = _rxBufferPos; // save message length
+            memset(_rxBuffer, 0, sizeof(_rxBuffer)); // clear receive buffer
+
             handleMessagesInternal(_message, _messageLength);
         }
         else // CRC error
