@@ -216,7 +216,7 @@ void J1850VPWCore::protocolDecoder()
 
 void J1850VPWCore::processMessage()
 {
-    if ((_rxBufferPos > 0) && (_ignoreList[_rxBuffer[0]] == 0))
+    if ((_rxBufferPos > 1) && (_ignoreList[_rxBuffer[0]] == 0))
     {
         if (_rxBuffer[_rxBufferPos - 1] == CRC(_rxBuffer, _rxBufferPos - 1)) // CRC ok
         {
