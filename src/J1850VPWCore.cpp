@@ -44,24 +44,28 @@ bool J1850VPWCore::begin(uint8_t rxPin, uint8_t txPin, bool activeLevel)
     _readOnly = false;
     _activeLevel = activeLevel;
     _passiveLevel = !_activeLevel;
+    _busIdle = true;
 
 #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
     if ((_rxPin != 2) && (_rxPin != 3)) return false; // Pin 2 or 3 must be selected as RX-pin!
-    if ((_txPin != 9) && (_txPin != 10)) return false; // Pin 9 or 10 must be selected as TX-pin!
 #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
     if ((_rxPin != 2)  && (_rxPin != 3)  && (_rxPin != 18) && (_rxPin != 19) && (_rxPin != 20) && (_rxPin != 21) && (_rxPin != 71) && (_rxPin != 72)) return false; // Pin 2, 3, 18, 19, 20, 21, 71 or 72 must be selected as RX-pin!
-    if ((_txPin != 11) && (_txPin != 12) && (_txPin != 13) && (_txPin != 2)  && (_txPin != 3)  && (_txPin != 5)  && (_txPin != 6)  && (_txPin != 7)  && (_txPin != 8)  && (_txPin != 44) && (_txPin != 45) && (_txPin != 46)) return false; // Pin 2, 3, 5, 6, 7, 8, 11, 12, 13, 44, 45 or 46 must be selected as TX-pin!
 #endif
 
-    pinMode(_txPin, OUTPUT); // set TX pin as output (must be a 16-bit timer pin)
+    protocolEncoderInit();
+    pinMode(_txPin, OUTPUT); // set TX pin as output
+
     if (_activeLevel) digitalWrite(_txPin, LOW); // pull TX pin low
     else digitalWrite(_txPin, HIGH); // pull TX pin high
 
-    protocolEncoderInit();
+    _timerOCRValue_J1850VPW_TX_SOF = (uint16_t)(((float)F_CPU / ((1000000.0/(float)J1850VPW_TX_SOF) * 64.0)) - 1.0);
+    _timerOCRValue_J1850VPW_TX_SRT = (uint16_t)(((float)F_CPU / ((1000000.0/(float)J1850VPW_TX_SRT) * 64.0)) - 1.0);
+    _timerOCRValue_J1850VPW_TX_LNG = (uint16_t)(((float)F_CPU / ((1000000.0/(float)J1850VPW_TX_LNG) * 64.0)) - 1.0);
+
     pinMode(_rxPin, INPUT); // set RX pin as input (must be external interrupt capable)
-    attachInterrupt(digitalPinToInterrupt(_rxPin), isrProtocolDecoder, CHANGE);
     busIdleTimerInit();
     listenAll();
+    attachInterrupt(digitalPinToInterrupt(_rxPin), isrProtocolDecoder, CHANGE);
 
     return true;
 }
@@ -72,6 +76,7 @@ bool J1850VPWCore::begin(uint8_t rxPin, bool activeLevel)
     _readOnly = true;
     _activeLevel = activeLevel;
     _passiveLevel = !_activeLevel;
+    _busIdle = true;
 
 #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
     if ((_rxPin != 2) && (_rxPin != 3)) return false; // Pin 2 or 3 must be selected as RX-pin!
@@ -80,37 +85,150 @@ bool J1850VPWCore::begin(uint8_t rxPin, bool activeLevel)
 #endif
 
     pinMode(_rxPin, INPUT); // set RX pin as input (must be external interrupt capable)
-    attachInterrupt(digitalPinToInterrupt(_rxPin), isrProtocolDecoder, CHANGE);
     busIdleTimerInit();
     listenAll();
+    attachInterrupt(digitalPinToInterrupt(_rxPin), isrProtocolDecoder, CHANGE);
 
     return true;
 }
 
 void J1850VPWCore::protocolEncoderInit()
 {
-    // Setup Timer 4 to toggle PCI_TX pin in accordance with J1850 VPW timing requirements.
-    // The top value to count (OCR4A) and prescaler (TCCR4B) registers will be modified on-the-fly.
+    // Setup Timer 1 (Uno) or Timer 4 (Mega) to toggle TX pin in accordance with J1850 VPW timing requirements.
     ATOMIC_BLOCK(ATOMIC_FORCEON)
     {
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+        TCCR1A = 0; // clear register
+        TCCR1B = 0; // clear register
+        TCNT1 = 0; // clear counter
+        TIMSK1 |= (1 << OCIE1A); // enable Output Compare Match A Interrupt
+        OCR1A = 0; // top value to count
+        TCCR1B |= (1 << WGM12); // CTC mode, stop timer
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
         TCCR4A = 0; // clear register
         TCCR4B = 0; // clear register
         TCNT4 = 0; // clear counter
-        TCCR4A |= (1 << COM4A0); // toggle OC4A on compare match
         TIMSK4 |= (1 << OCIE4A); // enable Output Compare Match A Interrupt
         OCR4A = 0; // top value to count
         TCCR4B |= (1 << WGM42); // CTC mode, stop timer
+#endif
     }
 }
 
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+ISR(TIMER1_COMPA_vect)
+{
+    VPW.protocolEncoder();
+}
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
 ISR(TIMER4_COMPA_vect)
 {
     VPW.protocolEncoder();
 }
+#endif
 
 void J1850VPWCore::protocolEncoder()
 {
-    // TODO
+    // Warning: no bus-arbitration detector algorithm is used!
+    
+    if (_sofWrite)
+    {
+        _sofWrite = false;
+        _bitWrite = true;
+
+        digitalWrite(_txPin, _activeLevel);
+
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+        OCR1A = _timerOCRValue_J1850VPW_TX_SOF; // 200 us
+        TCNT1 = 0; // reset counter;
+        TCCR1B |= (1 << CS11) | (1 << CS10); // prescaler 64, start timer
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+        OCR4A = _timerOCRValue_J1850VPW_TX_SOF; // 200 us
+        TCNT4 = 0; // reset counter;
+        TCCR4B |= (1 << CS41) | (1 << CS40); // prescaler 64, start timer
+#endif
+
+        return;
+    }
+
+    if (_bitWrite)
+    {
+        if (_lastState == 1) // active bus
+        {
+            digitalWrite(_txPin, _activeLevel);
+            
+            if (_txBuffer[_txBufferPos] & (1 << (7 - _bitNumWrite))) // logic 1
+            {
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+                OCR1A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+                OCR4A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+#endif
+            }
+            else // logic 0
+            {
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+                OCR1A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+                OCR4A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+#endif
+            }
+        }
+        else // passive bus
+        {
+            digitalWrite(_txPin, _passiveLevel);
+            
+            if (_txBuffer[_txBufferPos] & (1 << (7 - _bitNumWrite))) // logic 1
+            {
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+                OCR1A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+                OCR4A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+#endif
+            }
+            else // logic 0
+            {
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+                OCR1A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+                OCR4A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+#endif
+            }
+        }
+
+        _bitNumWrite++;
+
+        if (_bitNumWrite == 8)
+        {
+            _bitNumWrite = 0;
+            _txBufferPos++;
+
+            if (_txBufferPos == _txLength)
+            {
+                _bitWrite = false;
+                _eofWrite = true;
+            }
+        }
+
+        return;
+    }
+
+    if (_eofWrite)
+    {
+        _eofWrite = false;
+
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+        TCCR1B &= ~(1 << CS11) & ~(1 << CS10); // clear prescaler to stop timer
+        TCNT1 = 0; // reset counter;
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+        TCCR4B &= ~(1 << CS41) & ~(1 << CS40); // clear prescaler to stop timer
+        TCNT4 = 0; // reset counter;
+#endif
+
+        digitalWrite(_txPin, _passiveLevel);
+
+        return;
+    }
 }
 
 void J1850VPWCore::write(uint8_t* buffer, uint8_t bufferLength)
@@ -133,9 +251,26 @@ void J1850VPWCore::write(uint8_t* buffer, uint8_t bufferLength)
     _txBufferPos = 0; // reset transmit buffer position
     _txLength = bufferLength + 1; // save message length (+1 CRC byte)
 
-    // TODO: trigger message transmission
+    bool timeout = false;
+    uint32_t timeoutStart = millis();
 
-    handleErrorsInternal(J1850VPW_Write, J1850VPW_ERR_TX_DISABLED);
+    while (!_busIdle && !timeout)
+    {
+        if ((uint32_t)(millis() - timeoutStart) >= 1000) timeout = true;
+    }
+
+    if (timeout)
+    {
+        handleErrorsInternal(J1850VPW_Write, J1850VPW_ERR_BUS_IS_BUSY);
+        return;
+    }
+
+    _sofWrite = true;
+    _bitWrite = false;
+    _bitNumWrite = 0;
+    _eofWrite = false;
+
+    protocolEncoder();
 }
 
 void J1850VPWCore::protocolDecoder()
@@ -143,16 +278,7 @@ void J1850VPWCore::protocolDecoder()
     uint32_t now = micros();
     uint32_t diff = (uint32_t)(now - _lastChange);
     _lastChange = now;
-    _busIdle = false;
-
-    if (digitalRead(_rxPin)) // RX pin transitioned from low to high
-    {
-        _lastState = 0; // save last state
-    }
-    else // RX pin transitioned from high to low
-    {
-        _lastState = 1; // save last state
-    }
+    _lastState = !digitalRead(_rxPin);
 
     if (diff < J1850VPW_RX_SRT_MIN) // too short to be a valid pulse
     {
@@ -167,6 +293,7 @@ void J1850VPWCore::protocolDecoder()
             _bitPos = 0;
             _rxBufferPos = 0;
             _IFRDetected = false;
+            _busIdle = false;
         }
 
         return;
@@ -239,7 +366,7 @@ void J1850VPWCore::processMessage()
 void J1850VPWCore::busIdleTimerInit()
 {
     // Setup Timer 2 to measure ~282 us time interval to decide if bus is idle.
-    _calculatedOCR2AValue = (uint8_t)(roundf(((float)F_CPU / ((1000000.0/(float)J1850VPW_RX_IFS_MIN) * 32.0)) - 1.0));
+    uint8_t _calculatedOCR2AValue = (uint8_t)(roundf(((float)F_CPU / ((1000000.0/(float)J1850VPW_RX_IFS_MIN) * 32.0)) - 1.0));
 
     ATOMIC_BLOCK(ATOMIC_FORCEON)
     {

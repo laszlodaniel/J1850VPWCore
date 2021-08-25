@@ -18,8 +18,8 @@
 
 #include <J1850VPWCore.h>
 
-#define J1850VPW_RX 2 // INT4 on Mega
-#define J1850VPW_TX 6 // OC4A on Mega
+#define J1850VPW_RX 2 // INT0 on Uno, INT4 on Mega
+#define J1850VPW_TX 9
 #define SLEEP       5
 #define _4XLOOP     7
 

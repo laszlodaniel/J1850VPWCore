@@ -1,19 +1,18 @@
 # J1850 VPW Arduino Library
 
-This Arduino library allows the user to receive and send messages on a vehicle diagnostic bus commonly known as PCI-bus.  
-It uses interrupts to decode and encode VPW protocol.  
+This Arduino library allows the user to receive and send messages on Chrysler's PCI-bus.  
+It uses interrupts to decode and encode J1850 VPW protocol.  
+Only Uno and Mega boards are supported.
 
 RX-pin must be external interrupt capable:
 - Arduino Uno: 2 or 3
 - Arduino Mega: 2, 3, 18, 19, 20 or 21 (pins 71 and 72 are not broken out to the connector)
 
-TX-pin must be a 16-bit timer output pin:
-- Arduino Uno: 9 or 10
-- Arduino Mega: 2, 3, 5, 6, 7, 8, 11, 12, 13, 44, 45 or 46
+TX-pin can be any unused pin.
 
-Writing is not yet supported!
+Message reception and transmission is handled at the same time.
 
-The library is based on [Ryzhkov Ilya's J1850 library](https://github.com/iiryzhkov/j1850_arduino) which serves as a basis for [Stepan Matafonov's J1850 VPW Arduino Transceiver Library](https://github.com/matafonoff/J1850-VPW-Arduino-Transceiver-Library), that is a more advanced library utilizing pin change interrupts to achieve nearly non-blocking operation.
+Without a live PCI-bus network the library is easy to test with the loop-back method: short selected RX/TX pins, upload J1850VPWWrite example, open Arduino Serial Monitor and observe the repeated test message.
 
 ![IMG](https://chryslerccdsci.files.wordpress.com/2021/04/pci-bus_transceiver_schematic_03.png)
 
