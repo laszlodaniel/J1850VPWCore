@@ -16,7 +16,7 @@ Bus-idle condition is measured with Timer 2 (Uno/Mega).
 The protocol encoder uses Timer 1 (Uno) or Timer 4 (Mega) to signal TX pin state changes in accordance with J1850 VPW timing requirements.  
 Make sure that these timers are not used by other functions.
 
-Without a live PCI-bus network the library is easy to test with the loop-back method: short selected RX/TX pins, upload J1850VPWWrite example, open Arduino Serial Monitor and observe the repeated test message.
+Without a suitable transceiver circuit/chip and live PCI-bus network the library is easy to test with the loop-back method: short selected RX/TX pins, upload J1850VPWWrite example, open Arduino Serial Monitor and observe the repeated test message.
 
 ![IMG](https://chryslerccdsci.files.wordpress.com/2021/04/pci-bus_transceiver_schematic_03.png)
 
