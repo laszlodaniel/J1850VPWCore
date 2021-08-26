@@ -99,12 +99,14 @@ void setup()
     pinMode(_4XLOOP, OUTPUT);
     digitalWrite(_4XLOOP, LOW); // PCI-bus waveshaping - LOW: enabled, HIGH: disabled
     VPW.onMessageReceived(PCIMessageReceived); // subscribe to the message received event and call this function when a PCI-bus message is received
-    VPW.onError(PCIHandleError);
+    VPW.onError(PCIHandleError); // subscribe to the error event and call this function when an error occurs
     VPW.begin(J1850VPW_RX, J1850VPW_TX, ACTIVE_HIGH);
+
+    VPW.ignoreAll(); // don't let any message through
     VPW.listen(messageFilter); // display selected messages only
-    //VPW.ignore(messageFilter); // ignore selected messages
+
     //VPW.listenAll(); // disable message filtering
-    //VPW.ignoreAll(); // don't let any message through
+    //VPW.ignore(messageFilter); // ignore selected messages
 }
 
 void loop()

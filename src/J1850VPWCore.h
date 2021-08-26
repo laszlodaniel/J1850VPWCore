@@ -75,8 +75,8 @@ enum J1850VPW_Errors
     J1850VPW_ERR_CRC                    = 0x86
 };
 
-typedef void (*onJ1850VPWMessageReceivedHandler)(uint8_t* message, uint8_t messageLength);
-typedef void (*onJ1850VPWErrorHandler)(J1850VPW_Operations op, J1850VPW_Errors err);
+typedef void (*onVPWMessageReceivedHandler)(uint8_t* message, uint8_t messageLength);
+typedef void (*onVPWErrorHandler)(J1850VPW_Operations op, J1850VPW_Errors err);
 
 class J1850VPWCore
 {
@@ -93,8 +93,8 @@ class J1850VPWCore
         void protocolEncoder();
         void protocolDecoder();
         void busIdleTimerHandler();
-        void onMessageReceived(onJ1850VPWMessageReceivedHandler msgHandler);
-        void onError(onJ1850VPWErrorHandler errHandler);
+        void onMessageReceived(onVPWMessageReceivedHandler msgHandler);
+        void onError(onVPWErrorHandler errHandler);
 
     private:
         uint8_t _rxPin;
@@ -112,25 +112,29 @@ class J1850VPWCore
         volatile bool _busIdle;
         volatile uint32_t _lastChange;
         volatile bool _lastState;
+        volatile bool _currentRxBit;
         volatile bool _sofRead;
         volatile uint8_t _bitPos;
         volatile bool _IFRDetected;
         volatile bool _sofWrite;
         volatile bool _bitWrite;
         volatile uint8_t _bitNumWrite;
+        volatile bool _currentState;
+        volatile bool _currentTxBit;
         volatile bool _eofWrite;
         uint16_t _timerOCRValue_J1850VPW_TX_SOF;
         uint16_t _timerOCRValue_J1850VPW_TX_SRT;
         uint16_t _timerOCRValue_J1850VPW_TX_LNG;
-        uint8_t _ignoreList[256];
-        volatile onJ1850VPWMessageReceivedHandler _msgHandler;
-        volatile onJ1850VPWErrorHandler _errHandler;
+        uint8_t _ignoreList[32];
+        volatile onVPWMessageReceivedHandler _msgHandler;
+        volatile onVPWErrorHandler _errHandler;
         void protocolEncoderInit();
         void protocolDecoderInit();
         void processMessage();
         void busIdleTimerInit();
         void busIdleTimerStart();
         void busIdleTimerStop();
+        uint8_t* getBit(uint8_t id, uint8_t* pBit);
         uint8_t CRC(uint8_t* _buff, uint8_t _nbytes);
         void handleMessagesInternal(uint8_t* _message, uint8_t _messageLength);
         void handleErrorsInternal(J1850VPW_Operations _op, J1850VPW_Errors _err);
