@@ -136,7 +136,7 @@ void J1850VPWCore::protocolEncoder()
         _bitWrite = true;
         _currentState = _activeLevel;
 
-        digitalWrite(_txPin, _currentState);
+        digitalWrite(_txPin, _activeLevel);
 
 #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
         OCR1A = _timerOCRValue_J1850VPW_TX_SOF; // 200 us
@@ -336,7 +336,7 @@ void J1850VPWCore::protocolDecoder()
                 _rxBuffer[_rxBufferPos] |= (1 << (7 - _bitPos)); // save passive 1 bit
                 _currentRxBit = 1;
             }
-            else if (IS_BETWEEN(diff, J1850VPW_RX_SRT_MIN, J1850VPW_RX_SRT_MAX))
+            else if (diff <= J1850VPW_RX_SRT_MAX)
             {
                 _currentRxBit = 0;
             }
