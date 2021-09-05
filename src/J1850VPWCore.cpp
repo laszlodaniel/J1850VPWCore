@@ -32,7 +32,7 @@ J1850VPWCore::~J1850VPWCore()
     // Empty class destructor.
 }
 
-static void isrProtocolDecoder()
+static void isrVPWProtocolDecoder()
 {
     VPW.protocolDecoder();
 }
@@ -64,7 +64,7 @@ bool J1850VPWCore::begin(uint8_t rxPin, uint8_t txPin, bool activeLevel)
     busIdleTimerInit();
     busIdleTimerStart();
     listenAll();
-    attachInterrupt(digitalPinToInterrupt(_rxPin), isrProtocolDecoder, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(_rxPin), isrVPWProtocolDecoder, CHANGE);
 
     return true;
 }
@@ -86,7 +86,7 @@ bool J1850VPWCore::begin(uint8_t rxPin, bool activeLevel)
     busIdleTimerInit();
     busIdleTimerStart();
     listenAll();
-    attachInterrupt(digitalPinToInterrupt(_rxPin), isrProtocolDecoder, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(_rxPin), isrVPWProtocolDecoder, CHANGE);
 
     return true;
 }
@@ -159,6 +159,17 @@ void J1850VPWCore::protocolEncoder()
         if (_currentState != _lastState)
         {
             _bitWrite = false;
+            digitalWrite(_txPin, _passiveLevel);
+            busIdleTimerStart(); // look for bus-idle
+
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+            TCCR1B &= ~(1 << CS11) & ~(1 << CS10); // clear prescaler to stop timer
+            TCNT1 = 0; // reset counter;
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+            TCCR4B &= ~(1 << CS41) & ~(1 << CS40); // clear prescaler to stop timer
+            TCNT4 = 0; // reset counter;
+#endif
+
             handleErrorsInternal(J1850VPW_Write, J1850VPW_ERR_ARBITRATION_LOST); // report error
             return;
         }
@@ -488,16 +499,16 @@ void J1850VPWCore::ignore(uint8_t* ids)
     }
 }
 
-uint8_t* J1850VPWCore::getBit(uint8_t id, uint8_t *pBit)
+uint8_t* J1850VPWCore::getBit(uint8_t _id, uint8_t* _pBit)
 {
-    if (!id)
+    if (!_id)
     {
-        *pBit = 0xFF;
+        *_pBit = 0xFF;
         return NULL;
     }
 
-    *pBit = id % 8;
-    return &(_ignoreList[id / 8]);
+    *_pBit = _id % 8;
+    return &(_ignoreList[_id / 8]);
 }
 
 uint8_t J1850VPWCore::CRC(uint8_t* _buff, uint8_t _nbytes)

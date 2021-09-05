@@ -134,7 +134,7 @@ class J1850VPWCore
         void busIdleTimerInit();
         void busIdleTimerStart();
         void busIdleTimerStop();
-        uint8_t* getBit(uint8_t id, uint8_t* pBit);
+        uint8_t* getBit(uint8_t _id, uint8_t* _pBit);
         uint8_t CRC(uint8_t* _buff, uint8_t _nbytes);
         void handleMessagesInternal(uint8_t* _message, uint8_t _messageLength);
         void handleErrorsInternal(J1850VPW_Operations _op, J1850VPW_Errors _err);
