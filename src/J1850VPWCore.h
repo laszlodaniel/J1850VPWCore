@@ -1,6 +1,6 @@
 /*
  * J1850VPWCore (https://github.com/laszlodaniel/J1850VPWCore)
- * Copyright (C) 2021, Daniel Laszlo
+ * Copyright (C) 2021-2022, Daniel Laszlo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -110,6 +110,8 @@ class J1850VPWCore
         uint8_t _txBufferPos;
         uint8_t _txLength;
         volatile bool _busIdle;
+        volatile uint32_t _now;
+        volatile uint32_t _diff;
         volatile uint32_t _lastChange;
         volatile bool _lastState;
         volatile bool _currentRxBit;
@@ -125,6 +127,7 @@ class J1850VPWCore
         uint16_t _timerOCRValue_J1850VPW_TX_SOF;
         uint16_t _timerOCRValue_J1850VPW_TX_SRT;
         uint16_t _timerOCRValue_J1850VPW_TX_LNG;
+        uint16_t _timerOCRValue_J1850VPW_TX_EOF;
         uint8_t _ignoreList[32];
         volatile onVPWMessageReceivedHandler _msgHandler;
         volatile onVPWErrorHandler _errHandler;

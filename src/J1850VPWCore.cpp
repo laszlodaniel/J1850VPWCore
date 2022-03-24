@@ -1,6 +1,6 @@
 /*
  * J1850VPWCore (https://github.com/laszlodaniel/J1850VPWCore)
- * Copyright (C) 2021, Daniel Laszlo
+ * Copyright (C) 2021-2022, Daniel Laszlo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,6 +59,7 @@ bool J1850VPWCore::begin(uint8_t rxPin, uint8_t txPin, bool activeLevel)
     _timerOCRValue_J1850VPW_TX_SOF = (uint16_t)(((float)F_CPU / ((1000000.0/(float)J1850VPW_TX_SOF) * 64.0)) - 1.0);
     _timerOCRValue_J1850VPW_TX_SRT = (uint16_t)(((float)F_CPU / ((1000000.0/(float)J1850VPW_TX_SRT) * 64.0)) - 1.0);
     _timerOCRValue_J1850VPW_TX_LNG = (uint16_t)(((float)F_CPU / ((1000000.0/(float)J1850VPW_TX_LNG) * 64.0)) - 1.0);
+    _timerOCRValue_J1850VPW_TX_EOF = (uint16_t)(((float)F_CPU / ((1000000.0/(float)J1850VPW_TX_EOF) * 64.0)) - 1.0);
 
     pinMode(_rxPin, INPUT); // set RX pin as input (must be external interrupt capable)
     busIdleTimerInit();
@@ -128,6 +129,8 @@ ISR(TIMER4_COMPA_vect)
 
 void J1850VPWCore::protocolEncoder()
 {
+    // TODO: arbitration detector
+
     _busIdle = false;
     
     if (_sofWrite)
@@ -155,24 +158,6 @@ void J1850VPWCore::protocolEncoder()
     {
         _currentState = !_currentState; // alternate between passive and active states
         _currentTxBit = _txBuffer[_txBufferPos] & (1 << (7 - _bitNumWrite));
-
-        if (_currentState != _lastState)
-        {
-            _bitWrite = false;
-            digitalWrite(_txPin, _passiveLevel);
-            busIdleTimerStart(); // look for bus-idle
-
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-            TCCR1B &= ~(1 << CS11) & ~(1 << CS10); // clear prescaler to stop timer
-            TCNT1 = 0; // reset counter;
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-            TCCR4B &= ~(1 << CS41) & ~(1 << CS40); // clear prescaler to stop timer
-            TCNT4 = 0; // reset counter;
-#endif
-
-            handleErrorsInternal(J1850VPW_Write, J1850VPW_ERR_ARBITRATION_LOST); // report error
-            return;
-        }
 
         if (_currentState == _passiveLevel) // passive bus
         {
@@ -237,6 +222,18 @@ void J1850VPWCore::protocolEncoder()
     if (_eofWrite)
     {
         _eofWrite = false;
+        digitalWrite(_txPin, _passiveLevel);
+
+#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+        OCR1A = _timerOCRValue_J1850VPW_TX_EOF; // 280 us
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+        OCR4A = _timerOCRValue_J1850VPW_TX_EOF; // 280 us
+#endif
+
+        return;
+    }
+
+    _busIdle = true;
 
 #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
         TCCR1B &= ~(1 << CS11) & ~(1 << CS10); // clear prescaler to stop timer
@@ -246,14 +243,11 @@ void J1850VPWCore::protocolEncoder()
         TCNT4 = 0; // reset counter;
 #endif
 
-        digitalWrite(_txPin, _passiveLevel);
+    attachInterrupt(digitalPinToInterrupt(_rxPin), isrVPWProtocolDecoder, CHANGE); // restore receive interrupt
 
-        if (_lastState == _activeLevel)
-        {
-            _bitWrite = false;
-            handleErrorsInternal(J1850VPW_Write, J1850VPW_ERR_ARBITRATION_LOST); // report error
-        }
-    }
+    for (uint8_t i = 0; i < _txLength; i++) _rxBuffer[i] = _txBuffer[i]; // copy transmit buffer to message echo
+    _rxBufferPos = _txLength; // save length
+    processMessage(); // raise receive event here
 }
 
 void J1850VPWCore::write(uint8_t* buffer, uint8_t bufferLength)
@@ -295,14 +289,15 @@ void J1850VPWCore::write(uint8_t* buffer, uint8_t bufferLength)
     _bitNumWrite = 0;
     _eofWrite = false;
 
+    detachInterrupt(digitalPinToInterrupt(_rxPin)); // suspend receive interrupt while message is being transmitted
     protocolEncoder();
 }
 
 void J1850VPWCore::protocolDecoder()
 {
-    uint32_t now = micros();
-    uint32_t diff = (uint32_t)(now - _lastChange);
-    _lastChange = now;
+    _now = micros();
+    _diff = (uint32_t)(_now - _lastChange);
+    _lastChange = _now;
     _lastState = !digitalRead(_rxPin);
 
     if (!_sofRead && (_lastState == _activeLevel))
@@ -311,7 +306,7 @@ void J1850VPWCore::protocolDecoder()
         busIdleTimerStart(); // look for bus-idle
     }
 
-    if (diff < J1850VPW_RX_SRT_MIN) // too short to be a valid pulse
+    if (_diff < J1850VPW_RX_SRT_MIN) // too short to be a valid pulse
     {
         _sofRead = false;
         return;
@@ -319,7 +314,7 @@ void J1850VPWCore::protocolDecoder()
 
     if (!_sofRead)
     {
-        if ((_sofRead = ((_lastState == _activeLevel) && IS_BETWEEN(diff, J1850VPW_RX_SOF_MIN, J1850VPW_RX_SOF_MAX))))
+        if ((_sofRead = ((_lastState == _activeLevel) && IS_BETWEEN(_diff, J1850VPW_RX_SOF_MIN, J1850VPW_RX_SOF_MAX))))
         {
             _bitPos = 0;
             _IFRDetected = false;
@@ -332,7 +327,7 @@ void J1850VPWCore::protocolDecoder()
     {
         busIdleTimerStart(); // look for the end of the frame
         
-        if (!_IFRDetected && IS_BETWEEN(diff, J1850VPW_RX_EOD_MIN, J1850VPW_RX_EOD_MAX)) // data ended and IFR detected
+        if (!_IFRDetected && IS_BETWEEN(_diff, J1850VPW_RX_EOD_MIN, J1850VPW_RX_EOD_MAX)) // data ended and IFR detected
         {
             _IFRDetected = true; // set flag to ignore incoming IFR
             processMessage();
@@ -342,12 +337,12 @@ void J1850VPWCore::protocolDecoder()
 
         if (!_IFRDetected)
         {
-            if (IS_BETWEEN(diff, J1850VPW_RX_LNG_MIN, J1850VPW_RX_LNG_MAX))
+            if (IS_BETWEEN(_diff, J1850VPW_RX_LNG_MIN, J1850VPW_RX_LNG_MAX))
             {
                 _rxBuffer[_rxBufferPos] |= (1 << (7 - _bitPos)); // save passive 1 bit
                 _currentRxBit = 1;
             }
-            else if (diff <= J1850VPW_RX_SRT_MAX)
+            else if (_diff <= J1850VPW_RX_SRT_MAX)
             {
                 _currentRxBit = 0;
             }
@@ -357,12 +352,12 @@ void J1850VPWCore::protocolDecoder()
     {
         if (!_IFRDetected)
         {
-            if (diff <= J1850VPW_RX_SRT_MAX)
+            if (_diff <= J1850VPW_RX_SRT_MAX)
             {
                 _rxBuffer[_rxBufferPos] |= (1 << (7 - _bitPos)); // save active 1 bit
                 _currentRxBit = 1;
             }
-            else if (IS_BETWEEN(diff, J1850VPW_RX_LNG_MIN, J1850VPW_RX_LNG_MAX))
+            else if (IS_BETWEEN(_diff, J1850VPW_RX_LNG_MIN, J1850VPW_RX_LNG_MAX))
             {
                 _currentRxBit = 0;
             }
