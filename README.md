@@ -30,9 +30,11 @@ Message reception and transmission are handled simultaneously.
 - Make sure that these timers are not used by other functions
 
 **Teensy 4.x:**
-- Uses IntervalTimer library for precise microsecond timing
-- Automatically manages timer resources
-- No conflicts with other Teensy timer functions
+- Uses 2 IntervalTimer instances (out of 4 available)
+  - One for protocol encoder (TX timing)
+  - One for bus-idle detection
+- Leaves 2 IntervalTimer instances available for user code
+- All other Teensy timers (FlexPWM, QuadTimer, GPT) remain free for other uses
 
 Without a suitable transceiver circuit/chip and live PCI-bus network the library is easy to test with the loop-back method: short selected RX/TX pins, upload J1850VPWWrite example, open Arduino Serial Monitor and observe the repeated test message.
 
