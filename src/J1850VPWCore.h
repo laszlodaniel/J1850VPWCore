@@ -128,6 +128,10 @@ class J1850VPWCore
         uint16_t _timerOCRValue_J1850VPW_TX_SRT;
         uint16_t _timerOCRValue_J1850VPW_TX_LNG;
         uint16_t _timerOCRValue_J1850VPW_TX_EOF;
+#if defined(__IMXRT1062__)  // Teensy 4.x
+        IntervalTimer _txTimer;
+        IntervalTimer _busIdleTimer;
+#endif
         uint8_t _ignoreList[32];
         volatile onVPWMessageReceivedHandler _msgHandler;
         volatile onVPWErrorHandler _errHandler;

@@ -17,8 +17,15 @@
  */
 
 #include <J1850VPWCore.h>
-#include <util/atomic.h>
-#include <util/delay.h>
+
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+    // IntervalTimer callback functions (static so they can access VPW singleton)
+    static void txTimerISR() { VPW.protocolEncoder(); }
+    static void busIdleTimerISR() { VPW.busIdleTimerHandler(); }
+#else
+    #include <util/atomic.h>
+    #include <util/delay.h>
+#endif
 
 J1850VPWCore VPW;
 
@@ -45,10 +52,14 @@ bool J1850VPWCore::begin(uint8_t rxPin, uint8_t txPin, bool activeLevel)
     _activeLevel = activeLevel;
     _passiveLevel = !_activeLevel;
 
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-    if ((_rxPin != 2) && (_rxPin != 3)) return false; // Pin 2 or 3 must be selected as RX-pin!
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-    if ((_rxPin != 2)  && (_rxPin != 3)  && (_rxPin != 18) && (_rxPin != 19) && (_rxPin != 20) && (_rxPin != 21) && (_rxPin != 71) && (_rxPin != 72)) return false; // Pin 2, 3, 18, 19, 20, 21, 71 or 72 must be selected as RX-pin!
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+    // All digital pins support interrupts on Teensy 4.x
+#else
+    #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+        if ((_rxPin != 2) && (_rxPin != 3)) return false; // Pin 2 or 3 must be selected as RX-pin!
+    #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+        if ((_rxPin != 2)  && (_rxPin != 3)  && (_rxPin != 18) && (_rxPin != 19) && (_rxPin != 20) && (_rxPin != 21) && (_rxPin != 71) && (_rxPin != 72)) return false; // Pin 2, 3, 18, 19, 20, 21, 71 or 72 must be selected as RX-pin!
+    #endif
 #endif
 
     protocolEncoderInit();
@@ -77,10 +88,14 @@ bool J1850VPWCore::begin(uint8_t rxPin, bool activeLevel)
     _activeLevel = activeLevel;
     _passiveLevel = !_activeLevel;
 
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-    if ((_rxPin != 2) && (_rxPin != 3)) return false; // Pin 2 or 3 must be selected as RX-pin!
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-    if ((_rxPin != 2)  && (_rxPin != 3)  && (_rxPin != 18) && (_rxPin != 19) && (_rxPin != 20) && (_rxPin != 21) && (_rxPin != 71) && (_rxPin != 72)) return false; // Pin 2, 3, 18, 19, 20, 21, 71 or 72 must be selected as RX-pin!
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+    // All digital pins support interrupts on Teensy 4.x
+#else
+    #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+        if ((_rxPin != 2) && (_rxPin != 3)) return false; // Pin 2 or 3 must be selected as RX-pin!
+    #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+        if ((_rxPin != 2)  && (_rxPin != 3)  && (_rxPin != 18) && (_rxPin != 19) && (_rxPin != 20) && (_rxPin != 21) && (_rxPin != 71) && (_rxPin != 72)) return false; // Pin 2, 3, 18, 19, 20, 21, 71 or 72 must be selected as RX-pin!
+    #endif
 #endif
 
     pinMode(_rxPin, INPUT); // set RX pin as input (must be external interrupt capable)
@@ -95,36 +110,43 @@ bool J1850VPWCore::begin(uint8_t rxPin, bool activeLevel)
 void J1850VPWCore::protocolEncoderInit()
 {
     // Setup Timer 1 (Uno) or Timer 4 (Mega) to signal TX pin state changes in accordance with J1850 VPW timing requirements.
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+    // IntervalTimer will be initialized on-demand when transmission starts
+    // No setup needed here
+#else
     ATOMIC_BLOCK(ATOMIC_FORCEON)
     {
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-        TCCR1A = 0; // clear register
-        TCCR1B = 0; // clear register
-        TCNT1 = 0; // clear counter
-        TIMSK1 |= (1 << OCIE1A); // enable Output Compare Match A Interrupt
-        OCR1A = 0; // top value to count
-        TCCR1B |= (1 << WGM12); // CTC mode, stop timer
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-        TCCR4A = 0; // clear register
-        TCCR4B = 0; // clear register
-        TCNT4 = 0; // clear counter
-        TIMSK4 |= (1 << OCIE4A); // enable Output Compare Match A Interrupt
-        OCR4A = 0; // top value to count
-        TCCR4B |= (1 << WGM42); // CTC mode, stop timer
-#endif
+        #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+            TCCR1A = 0; // clear register
+            TCCR1B = 0; // clear register
+            TCNT1 = 0; // clear counter
+            TIMSK1 |= (1 << OCIE1A); // enable Output Compare Match A Interrupt
+            OCR1A = 0; // top value to count
+            TCCR1B |= (1 << WGM12); // CTC mode, stop timer
+        #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+            TCCR4A = 0; // clear register
+            TCCR4B = 0; // clear register
+            TCNT4 = 0; // clear counter
+            TIMSK4 |= (1 << OCIE4A); // enable Output Compare Match A Interrupt
+            OCR4A = 0; // top value to count
+            TCCR4B |= (1 << WGM42); // CTC mode, stop timer
+        #endif
     }
+#endif
 }
 
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-ISR(TIMER1_COMPA_vect)
-{
-    VPW.protocolEncoder();
-}
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-ISR(TIMER4_COMPA_vect)
-{
-    VPW.protocolEncoder();
-}
+#if !defined(__IMXRT1062__)  // AVR only
+    #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+    ISR(TIMER1_COMPA_vect)
+    {
+        VPW.protocolEncoder();
+    }
+    #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+    ISR(TIMER4_COMPA_vect)
+    {
+        VPW.protocolEncoder();
+    }
+    #endif
 #endif
 
 void J1850VPWCore::protocolEncoder()
@@ -141,14 +163,18 @@ void J1850VPWCore::protocolEncoder()
 
         digitalWrite(_txPin, _activeLevel);
 
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-        OCR1A = _timerOCRValue_J1850VPW_TX_SOF; // 200 us
-        TCNT1 = 0; // reset counter;
-        TCCR1B |= (1 << CS11) | (1 << CS10); // prescaler 64, start timer
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-        OCR4A = _timerOCRValue_J1850VPW_TX_SOF; // 200 us
-        TCNT4 = 0; // reset counter;
-        TCCR4B |= (1 << CS41) | (1 << CS40); // prescaler 64, start timer
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+        _txTimer.begin(txTimerISR, (uint32_t)J1850VPW_TX_SOF);  // Start timer with 200 us interval
+#else
+        #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+            OCR1A = _timerOCRValue_J1850VPW_TX_SOF; // 200 us
+            TCNT1 = 0; // reset counter;
+            TCCR1B |= (1 << CS11) | (1 << CS10); // prescaler 64, start timer
+        #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+            OCR4A = _timerOCRValue_J1850VPW_TX_SOF; // 200 us
+            TCNT4 = 0; // reset counter;
+            TCCR4B |= (1 << CS41) | (1 << CS40); // prescaler 64, start timer
+        #endif
 #endif
 
         return;
@@ -165,18 +191,26 @@ void J1850VPWCore::protocolEncoder()
 
             if (_currentTxBit) // logic 1
             {
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-                OCR1A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-                OCR4A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+                _txTimer.update((uint32_t)J1850VPW_TX_LNG);  // 128 us
+#else
+                #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+                    OCR1A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+                #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+                    OCR4A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+                #endif
 #endif
             }
             else // logic 0
             {
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-                OCR1A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-                OCR4A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+                _txTimer.update((uint32_t)J1850VPW_TX_SRT);  // 64 us
+#else
+                #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+                    OCR1A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+                #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+                    OCR4A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+                #endif
 #endif
             }
         }
@@ -186,18 +220,26 @@ void J1850VPWCore::protocolEncoder()
 
             if (_currentTxBit) // logic 1
             {
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-                OCR1A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-                OCR4A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+                _txTimer.update((uint32_t)J1850VPW_TX_SRT);  // 64 us
+#else
+                #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+                    OCR1A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+                #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+                    OCR4A = _timerOCRValue_J1850VPW_TX_SRT; // 64 us
+                #endif
 #endif
             }
             else // logic 0
             {
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-                OCR1A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-                OCR4A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+                _txTimer.update((uint32_t)J1850VPW_TX_LNG);  // 128 us
+#else
+                #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+                    OCR1A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+                #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+                    OCR4A = _timerOCRValue_J1850VPW_TX_LNG; // 128 us
+                #endif
 #endif
             }
         }
@@ -224,10 +266,14 @@ void J1850VPWCore::protocolEncoder()
         _eofWrite = false;
         digitalWrite(_txPin, _passiveLevel);
 
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
-        OCR1A = _timerOCRValue_J1850VPW_TX_EOF; // 280 us
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
-        OCR4A = _timerOCRValue_J1850VPW_TX_EOF; // 280 us
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+        _txTimer.update((uint32_t)J1850VPW_TX_EOF);  // 280 us
+#else
+        #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+            OCR1A = _timerOCRValue_J1850VPW_TX_EOF; // 280 us
+        #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+            OCR4A = _timerOCRValue_J1850VPW_TX_EOF; // 280 us
+        #endif
 #endif
 
         return;
@@ -235,12 +281,16 @@ void J1850VPWCore::protocolEncoder()
 
     _busIdle = true;
 
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+    _txTimer.end();  // Stop timer
+#else
+    #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__) // Arduino Uno
         TCCR1B &= ~(1 << CS11) & ~(1 << CS10); // clear prescaler to stop timer
         TCNT1 = 0; // reset counter;
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
+    #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) // Arduino Mega
         TCCR4B &= ~(1 << CS41) & ~(1 << CS40); // clear prescaler to stop timer
         TCNT4 = 0; // reset counter;
+    #endif
 #endif
 
     attachInterrupt(digitalPinToInterrupt(_rxPin), isrVPWProtocolDecoder, CHANGE); // restore receive interrupt
@@ -413,6 +463,10 @@ void J1850VPWCore::processMessage()
 void J1850VPWCore::busIdleTimerInit()
 {
     // Setup Timer 2 to measure ~282 us time interval to decide if bus is idle.
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+    // IntervalTimer will be initialized on-demand when timer starts
+    // No setup needed here
+#else
     uint8_t _calculatedOCR2AValue = (uint8_t)(roundf(((float)F_CPU / ((1000000.0/(float)J1850VPW_RX_IFS_MIN) * 32.0)) - 1.0));
 
     ATOMIC_BLOCK(ATOMIC_FORCEON)
@@ -424,24 +478,35 @@ void J1850VPWCore::busIdleTimerInit()
         TCCR2A |= (1 << WGM21); // CTC mode
         TIMSK2 |= (1 << OCIE2A); // enable Output Compare Match A Interrupt
     }
+#endif
 }
 
 void J1850VPWCore::busIdleTimerStart()
 {
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+    _busIdleTimer.begin(busIdleTimerISR, (uint32_t)J1850VPW_RX_IFS_MIN);  // 281 us (actually 282 based on define)
+#else
     TCNT2 = 0; // clear counter
     TCCR2B |= (1 << CS21) | (1 << CS20); // prescaler 32, start timer
+#endif
 }
 
 void J1850VPWCore::busIdleTimerStop()
 {
+#if defined(__IMXRT1062__)  // Teensy 4.x (4.0, 4.1, MicroMod)
+    _busIdleTimer.end();  // Stop timer
+#else
     TCCR2B &= ~(1 << CS21) & ~(1 << CS20); // clear prescaler to stop timer
     TCNT2 = 0; // clear counter
+#endif
 }
 
+#if !defined(__IMXRT1062__)  // AVR only
 ISR(TIMER2_COMPA_vect)
 {
     VPW.busIdleTimerHandler();
 }
+#endif
 
 void J1850VPWCore::busIdleTimerHandler()
 {
